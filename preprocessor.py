@@ -89,7 +89,8 @@ if __name__ == "__main__":
                "LTCUSDT","ETCUSDT","FORMUSDT",
                "TONUSDT","HFTUSDT","DOTUSDT",
                "CHESSUSDT","MKRUSDT","WIFUSDT"]
-    dataset_name = 'quotes_2025-06-07'
+    # dataset_name = 'quotes_2025-06-07'
+    dataset_name = 'quotes_2025-04-05'
     # dataset_name = 'book_snapshot_5_2025-05-22'
     df = generate_df(symbols, dataset_name)
     print(df.head(5))
