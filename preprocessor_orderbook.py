@@ -244,16 +244,17 @@ if __name__ == "__main__":
     # symbols = ["CHESSUSDT"]
     # symbols = ["TONUSDT"]
     # symbols = ["SOLUSDT","PNUTUSDT","TURBOUSDT","APTUSDT","AIXBTUSDT","TAOUSDT","KAITOUSDT","OMUSDT","XRPUSDT","FETUSDT","UNIUSDT","COMPUSDT","THEUSDT","AVAXUSDT","LTCUSDT","ETCUSDT","FORMUSDT","TONUSDT","HFTUSDT","DOTUSDT","CHESSUSDT"]
-    symbols = ["SOLUSDT","PNUTUSDT","TURBOUSDT","APTUSDT","AIXBTUSDT","TAOUSDT","KAITOUSDT","OMUSDT","XRPUSDT","FETUSDT","UNIUSDT","COMPUSDT","THEUSDT","AVAXUSDT","LTCUSDT","ETCUSDT","FORMUSDT","TONUSDT","HFTUSDT","DOTUSDT","CHESSUSDT"]
+    symbols = ["COMPUSDT","THEUSDT","AVAXUSDT","LTCUSDT","ETCUSDT","FORMUSDT","TONUSDT","HFTUSDT","DOTUSDT","CHESSUSDT"]
     
     dataset_name = 'book_snapshot_25'
     # start_date, end_date = "2025-09-21", "2025-09-27"
     start_date, end_date = "2025-10-01", "2025-10-20"
+    resample_rate = '20s'
     for symbol in symbols:
         # print(symbol)
-        df = generate_df_one_symbol(symbol, start_date=start_date, end_date=end_date, dataset_name=dataset_name, resample_rate = '20s')
+        df = generate_df_one_symbol(symbol, start_date=start_date, end_date=end_date, dataset_name=dataset_name, resample_rate = resample_rate)
         # df = generate_df(symbols, dataset_name)
         print(df.head(5))
         print(df.info())
-        df.to_csv(f"processed_obook_{dataset_name}_{symbol}_{start_date}_{end_date}.csv" , index=True, header=True, quoting=csv.QUOTE_NONNUMERIC)
-        print(f"DataFrame saved to processed_obook_{dataset_name}_{symbol}_{start_date}_{end_date}.csv  successfully.")
+        df.to_csv(f"processed_obook_{dataset_name}_{symbol}_{start_date}_{end_date}_{resample_rate}" , index=True, header=True, quoting=csv.QUOTE_NONNUMERIC)
+        print(f"DataFrame saved to processed_obook_{dataset_name}_{symbol}_{start_date}_{end_date}_{resample_rate}.csv  successfully.")
