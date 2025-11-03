@@ -33,48 +33,96 @@ def get_cumulative_amount_at_price(df, price_col_prefix, amount_col_prefix, targ
     return cumulative_amounts
 
 
-def generate_df_one_day_one_symbol(symbol, date = None, dataset_name = 'book_snapshot_25', resample_rate = '20s'):
-    df = None
-    # date = "2025-08-21"
-    dataset_name = 'book_snapshot_25'
-    # resample_rate = '1s'
-    # symbols = ["ETCUSDT"]
-    # symbol = "ETCUSDT"
+def generate_df_one_day_one_symbol(symbol, date = None, resample_rate = '20s'):
+    # Load trade data
     address = 'datasets'
-    thisName = dataset_name + '_' + date
-    spot_name1 = 'binance_' + thisName + '_'
-    swap_name1 = 'binance-futures_' + thisName + '_'
     fde_name = f'binance-futures_derivative_ticker_{date}_{symbol}.csv.gz'
-    spot_name2 = '.csv.gz'
-    swap_name2 = '.csv.gz'
-    # for symbol in symbols:
+    spot_name = f'binance_book_snapshot_25_{date}_{symbol}.csv.gz'
+    swap_name = f'binance-futures_book_snapshot_25_{date}_{symbol}.csv.gz'
+    spot_trade_name = f'binance_trades_{date}_{symbol}.csv.gz'
+    swap_trade_name = f'binance-futures_trades_{date}_{symbol}.csv.gz'
     print(f"Processing symbol: {symbol}, resample_rate: {resample_rate}")
-    print(symbol)
-    spot_name = spot_name1 + symbol + spot_name2
+    # Add sub-folder
+    spot_trade_name = os.path.join('trades', spot_trade_name)
+    swap_trade_name = os.path.join('ftrades', swap_trade_name)
+    spot_name = os.path.join('book', spot_name)
+    swap_name = os.path.join('fbook', swap_name)
+    fde_name = os.path.join('ftick', fde_name)
+    # Add dataset
     spot_name = os.path.join(address, spot_name)
-    swap_name = swap_name1 + symbol + swap_name2
     swap_name = os.path.join(address, swap_name)
     fde_name = os.path.join(address, fde_name)
+    spot_trade_name = os.path.join(address, spot_trade_name)
+    swap_trade_name = os.path.join(address, swap_trade_name)
     df_spot = pd.read_csv(spot_name, compression='gzip')
     df_swap = pd.read_csv(swap_name, compression='gzip')
     df_fde = pd.read_csv(fde_name, compression='gzip')
+    df_spot_trd = pd.read_csv(spot_trade_name, compression='gzip')
+    df_swap_trd = pd.read_csv(swap_trade_name, compression='gzip')
     df_spot['local_timestamp'] = pd.to_datetime(df_spot['local_timestamp'], unit='us', origin='unix')
     df_swap['local_timestamp'] = pd.to_datetime(df_swap['local_timestamp'], unit='us', origin='unix')
     df_fde['local_timestamp'] = pd.to_datetime(df_fde['local_timestamp'], unit='us', origin='unix')
     df_fde['funding_timestamp'] = pd.to_datetime(df_fde['funding_timestamp'], unit='us', origin='unix')
+    df_spot_trd['local_timestamp'] = pd.to_datetime(df_spot_trd['local_timestamp'], unit='us', origin='unix')
+    df_swap_trd['local_timestamp'] = pd.to_datetime(df_swap_trd['local_timestamp'], unit='us', origin='unix')
+
     # print(df_swap.info())
     df_spot = df_spot.set_index(pd.DatetimeIndex(df_spot['local_timestamp']))
     df_swap = df_swap.set_index(pd.DatetimeIndex(df_swap['local_timestamp']))
+    df_spot_trd = df_spot_trd.set_index(pd.DatetimeIndex(df_spot_trd['local_timestamp']))
+    df_swap_trd = df_swap_trd.set_index(pd.DatetimeIndex(df_swap_trd['local_timestamp']))
     df_fde = df_fde.set_index(pd.DatetimeIndex(df_fde['local_timestamp']))
+
     # Remove duplicate indices
     df_spot = df_spot[~df_spot.index.duplicated(keep='first')]
     df_swap = df_swap[~df_swap.index.duplicated(keep='first')]
     df_fde = df_fde[~df_fde.index.duplicated(keep='first')]
 
     # Resample and fill NaN values
-    df_spot = df_spot.resample('1s').ffill().bfill()
-    df_swap = df_swap.resample('1s').ffill().bfill()
-    df_fde = df_fde.resample('1s').ffill().bfill()
+    df_spot = df_spot.resample(resample_rate).ffill().bfill()
+    df_swap = df_swap.resample(resample_rate).ffill().bfill()
+    df_fde = df_fde.resample(resample_rate).ffill().bfill()
+
+    # Process trade data
+    df_spot_buy = df_spot_trd[df_spot_trd['side'] == 'buy'].copy()
+    df_spot_sell = df_spot_trd[df_spot_trd['side'] == 'sell'].copy()
+    df_swap_buy = df_swap_trd[df_swap_trd['side'] == 'buy'].copy()
+    df_swap_sell = df_swap_trd[df_swap_trd['side'] == 'sell'].copy()
+    
+    # Calculate total amount for each trade
+    df_spot_buy = df_spot_trd[df_spot_trd['side'] == 'buy'].copy()
+    df_spot_sell = df_spot_trd[df_spot_trd['side'] == 'sell'].copy()
+    df_swap_buy = df_swap_trd[df_swap_trd['side'] == 'buy'].copy()
+    df_swap_sell = df_swap_trd[df_swap_trd['side'] == 'sell'].copy()
+
+    # Resample df_spot_trd to the same time index as df_spot and aggregate buy and sell trades
+    df_spot_buy_agg = df_spot_buy.resample(resample_rate).agg({
+        'amount': 'sum',
+        'price': ['mean', 'std']
+    })
+    df_spot_sell_agg = df_spot_sell.resample(resample_rate).agg({
+        'amount': 'sum',
+        'price': ['mean', 'std']
+    })
+    df_swap_buy_agg = df_swap_buy.resample(resample_rate).agg({
+        'amount': 'sum',
+        'price': ['mean', 'std']
+    })
+    df_swap_sell_agg = df_swap_sell.resample(resample_rate).agg({
+        'amount': 'sum',
+        'price': ['mean', 'std']
+    })
+
+    # Rename columns for single level
+    df_spot_buy_agg.columns = ['spot_buy_amount_sum', 'spot_buy_price_mean', 'spot_buy_price_std']
+    df_spot_sell_agg.columns = ['spot_sell_amount_sum', 'spot_sell_price_mean', 'spot_sell_price_std']
+    df_swap_buy_agg.columns = ['swap_buy_amount_sum', 'swap_buy_price_mean', 'swap_buy_price_std']
+    df_swap_sell_agg.columns = ['swap_sell_amount_sum', 'swap_sell_price_mean', 'swap_sell_price_std']
+
+    # Merge the aggregated dataframes
+    df_trades = df_spot_buy_agg.merge(df_spot_sell_agg, left_index=True, right_index=True, how='inner')
+    df_trades = df_trades.merge(df_swap_buy_agg, left_index=True, right_index=True, how='inner')
+    df_trades = df_trades.merge(df_swap_sell_agg, left_index=True, right_index=True, how='inner')
 
     # Calculate cumulative amounts for df_spot
     for i in range(25):
@@ -220,17 +268,17 @@ def generate_df_one_day_one_symbol(symbol, date = None, dataset_name = 'book_sna
     # Merge the selected dataframes on their index
     df_merged = df_spot_selected.merge(df_swap_selected, left_index=True, right_index=True, how='inner')
     df_merged = df_merged.merge(df_fde_selected, left_index=True, right_index=True, how='inner')
+    df_combined = df_merged.merge(df_trades, left_index=True, right_index=True, how='inner')
 
+    return df_combined
 
-    return df_merged
-
-def generate_df_one_symbol(symbol, start_date = None, end_date = None, dataset_name = None, resample_rate = '1s'):
+def generate_df_one_symbol(symbol, start_date = None, end_date = None, resample_rate = '1s'):
     df = None
     date_range = pd.date_range(start=start_date, end=end_date)
     for date in date_range:
         date_str = date.strftime('%Y-%m-%d')
         print(f"Processing date: {date_str}")
-        df_day = generate_df_one_day_one_symbol(symbol, date_str, dataset_name, resample_rate = resample_rate)
+        df_day = generate_df_one_day_one_symbol(symbol, date_str, resample_rate = resample_rate)
         if df is None:
             df = df_day.copy()
         else:
@@ -240,21 +288,28 @@ def generate_df_one_symbol(symbol, start_date = None, end_date = None, dataset_n
     return df
 
 if __name__ == "__main__":
-    # symbols = ["AVAXUSDT"]
-    # symbols = ["CHESSUSDT"]
-    # symbols = ["TONUSDT"]
-    # symbols = ["SOLUSDT","PNUTUSDT","TURBOUSDT","APTUSDT","AIXBTUSDT","TAOUSDT","KAITOUSDT","OMUSDT","XRPUSDT","FETUSDT","UNIUSDT","COMPUSDT","THEUSDT","AVAXUSDT","LTCUSDT","ETCUSDT","FORMUSDT","TONUSDT","HFTUSDT","DOTUSDT","CHESSUSDT"]
-    symbols = ["COMPUSDT","THEUSDT","AVAXUSDT","LTCUSDT","ETCUSDT","FORMUSDT","TONUSDT","HFTUSDT","DOTUSDT","CHESSUSDT"]
-    
-    dataset_name = 'book_snapshot_25'
+    # symbols=["BTCUSDT","SOLUSDT","PNUTUSDT","TURBOUSDT","APTUSDT","AIXBTUSDT",
+    #          "TAOUSDT","KAITOUSDT","OMUSDT","XRPUSDT","FETUSDT","UNIUSDT",
+    #          "COMPUSDT","THEUSDT","AVAXUSDT","LTCUSDT","ETCUSDT","FORMUSDT",
+    #          "TONUSDT","HFTUSDT","DOTUSDT","CHESSUSDT",'ETHUSDT', 'BNBUSDT', 
+    #          'TRXUSDT', 'DOGEUSDT', 'ADAUSDT', 'LINKUSDT', 'XLMUSDT', 'BCHUSDT', 
+    #          'HBARUSDT','ZECUSDT', 'AAVEUSDT', 'ENAUSDT', 'NEARUSDT','ONDOUSDT'],   
+    # symbols = ["SOLUSDT", "COMPUSDT","DOTUSDT","CHESSUSDT"]
+    # symbols = ["BTCUSDT","SOLUSDT","PNUTUSDT","TURBOUSDT","APTUSDT","AIXBTUSDT",
+    #          "TAOUSDT","KAITOUSDT","OMUSDT","XRPUSDT","FETUSDT","UNIUSDT",
+    #          "COMPUSDT","THEUSDT","AVAXUSDT","LTCUSDT","ETCUSDT","FORMUSDT",
+    #          "TONUSDT","HFTUSDT","DOTUSDT","CHESSUSDT",'ETHUSDT', 'BNBUSDT', 
+    #          'TRXUSDT', 'DOGEUSDT', 'ADAUSDT', 'LINKUSDT', 'XLMUSDT', 'BCHUSDT', 
+    #          'HBARUSDT','ZECUSDT', 'AAVEUSDT', 'ENAUSDT', 'NEARUSDT','ONDOUSDT']   
+    symbols = ['BNBUSDT', 'ETHUSDT', 'ADAUSDT', 'LINKUSDT','TRXUSDT',"DOTUSDT"]
     # start_date, end_date = "2025-09-21", "2025-09-27"
-    start_date, end_date = "2025-10-01", "2025-10-20"
-    resample_rate = '20s'
+    start_date, end_date = "2025-09-01", "2025-09-30"
+    resample_rate = '1s'
     for symbol in symbols:
         # print(symbol)
-        df = generate_df_one_symbol(symbol, start_date=start_date, end_date=end_date, dataset_name=dataset_name, resample_rate = resample_rate)
+        df = generate_df_one_symbol(symbol, start_date=start_date, end_date=end_date,  resample_rate = resample_rate)
         # df = generate_df(symbols, dataset_name)
         print(df.head(5))
         print(df.info())
-        df.to_csv(f"processed_obook_{dataset_name}_{symbol}_{start_date}_{end_date}_{resample_rate}" , index=True, header=True, quoting=csv.QUOTE_NONNUMERIC)
-        print(f"DataFrame saved to processed_obook_{dataset_name}_{symbol}_{start_date}_{end_date}_{resample_rate}.csv  successfully.")
+        df.to_csv(f"processed_obook_{symbol}_{start_date}_{end_date}_{resample_rate}" , index=True, header=True, quoting=csv.QUOTE_NONNUMERIC)
+        print(f"DataFrame saved to processed_obook_{symbol}_{start_date}_{end_date}_{resample_rate}.csv  successfully.")

@@ -166,8 +166,8 @@ def experiment_ukf(df_train, df_test, predict_cols, n_latent_variables = 10):
     state_means_initial, state_covariances_initial = kf_initial.filter(df_train[predict_cols].values)
 
     # Initial state mean and covariance from the basic KF training
-    initial_state_mean = state_means_initial[-1].reshape(-1, 1)
-    initial_state_covariance = state_covariances_initial[-1]
+    # initial_state_mean = state_means_initial[-1].reshape(-1, 1)
+    # initial_state_covariance = state_covariances_initial[-1]
 
     # Initial state mean and covariance (can be estimated from training data or prior knowledge)
     # Using the last state mean and covariance from the EKF for initialization
@@ -196,7 +196,7 @@ def experiment_ukf(df_train, df_test, predict_cols, n_latent_variables = 10):
 
     for i in range(len(df_test)):
         # Get the actual observation for the current time step
-        actual_observation = df_test[predict_cols].iloc[max(i - 1,0)].values
+        actual_observation = df_test[predict_cols].iloc[i].values
 
         # UKF Prediction Step
         ukf.predict()
@@ -268,21 +268,21 @@ def experiment_kf(df_train, df_test, predict_cols, n_latent_variables = 10):
         predicted_state_covariance = transition_matrix @ current_covariance @ transition_matrix.T + transition_covariance_matrix
 
         # If not the first time step, use the previous actual observation to update the state
-        if i > 0:
-            # Get the actual observation from df_test for the previous time step
-            previous_actual_observation = df_test[predict_cols].iloc[i-1].values.reshape(-1, 1)
+        # if i > 0:
+        # Get the actual observation from df_test for the previous time step
+        previous_actual_observation = df_test[predict_cols].iloc[i].values.reshape(-1, 1)
 
-            # Calculate the Kalman Gain
-            innovation_covariance = observation_matrix @ predicted_state_covariance @ observation_matrix.T + observation_covariance_matrix
-            kalman_gain = predicted_state_covariance @ observation_matrix.T @ np.linalg.inv(innovation_covariance)
+        # Calculate the Kalman Gain
+        innovation_covariance = observation_matrix @ predicted_state_covariance @ observation_matrix.T + observation_covariance_matrix
+        kalman_gain = predicted_state_covariance @ observation_matrix.T @ np.linalg.inv(innovation_covariance)
 
-            # Update the state using the previous actual observation
-            current_mean = predicted_state_mean + kalman_gain @ (previous_actual_observation - observation_matrix @ predicted_state_mean)
-            current_covariance = predicted_state_covariance - kalman_gain @ observation_matrix @ predicted_state_covariance
-        else:
-            # For the first time step, use the predicted state from the training period
-            current_mean = predicted_state_mean
-            current_covariance = predicted_state_covariance
+        # Update the state using the previous actual observation
+        current_mean = predicted_state_mean + kalman_gain @ (previous_actual_observation - observation_matrix @ predicted_state_mean)
+        current_covariance = predicted_state_covariance - kalman_gain @ observation_matrix @ predicted_state_covariance
+        # else:
+        #     # For the first time step, use the predicted state from the training period
+        #     current_mean = predicted_state_mean
+        #     current_covariance = predicted_state_covariance
 
 
         # The prediction of the observation is based on the current (updated) state
@@ -306,7 +306,8 @@ def experiment_pf(df_train, df_test, predict_cols, n_latent_variables = 10):
 
     # Define the number of particles
     n_particles = 50
-    
+    # Define the number of observation dimensions
+    # Corrected the number of latent variables to match the number of observed variables
     n_observation_dimensions = len(predict_cols) # We are observing basis1, basis2, basis1_dt, and basis2_dt
 
     # Define the state transition function (non-linear example)
