@@ -311,5 +311,5 @@ if __name__ == "__main__":
         # df = generate_df(symbols, dataset_name)
         print(df.head(5))
         print(df.info())
-        df.to_csv(f"processed_obook_{symbol}_{start_date}_{end_date}_{resample_rate}" , index=True, header=True, quoting=csv.QUOTE_NONNUMERIC)
+        df.to_csv(f"processed_obook_{symbol}_{start_date}_{end_date}_{resample_rate}.csv" , index=True, header=True, quoting=csv.QUOTE_NONNUMERIC)
         print(f"DataFrame saved to processed_obook_{symbol}_{start_date}_{end_date}_{resample_rate}.csv  successfully.")
