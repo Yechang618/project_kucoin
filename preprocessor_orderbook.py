@@ -263,7 +263,7 @@ def generate_df_one_day_one_symbol(symbol, date = None, resample_rate = '20s'):
     ]]
 
     # Select specified columns from df_fde
-    df_fde_selected = df_fde[['funding_rate']]
+    df_fde_selected = df_fde[['funding_rate', 'index_price']]
 
     # Merge the selected dataframes on their index
     df_merged = df_spot_selected.merge(df_swap_selected, left_index=True, right_index=True, how='inner')
@@ -301,10 +301,12 @@ if __name__ == "__main__":
     #          "TONUSDT","HFTUSDT","DOTUSDT","CHESSUSDT",'ETHUSDT', 'BNBUSDT', 
     #          'TRXUSDT', 'DOGEUSDT', 'ADAUSDT', 'LINKUSDT', 'XLMUSDT', 'BCHUSDT', 
     #          'HBARUSDT','ZECUSDT', 'AAVEUSDT', 'ENAUSDT', 'NEARUSDT','ONDOUSDT']   
-    symbols = ['BNBUSDT', 'ETHUSDT', 'ADAUSDT', 'LINKUSDT','TRXUSDT',"DOTUSDT"]
+    # symbols = ['BNBUSDT', 'ETHUSDT', 'ADAUSDT', 'LINKUSDT','TRXUSDT',"DOTUSDT"]
+    symbols = ["SOLUSDT"]
     # start_date, end_date = "2025-09-21", "2025-09-27"
-    start_date, end_date = "2025-09-01", "2025-09-30"
-    resample_rate = '1s'
+    # start_date, end_date = "2025-09-01", "2025-09-30"
+    start_date, end_date = "2025-06-01", "2025-10-09"
+    resample_rate = '20s'
     for symbol in symbols:
         # print(symbol)
         df = generate_df_one_symbol(symbol, start_date=start_date, end_date=end_date,  resample_rate = resample_rate)

@@ -211,3 +211,5 @@ datasets
 datasets/.
 processed_csv
 processed_csv/.
+kucoin_futures_data
+kucoin_futures_data/.
