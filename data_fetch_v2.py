@@ -27,7 +27,7 @@ def get_futures_ws_token():
     return resp.json()["data"]
 
 # ------------------------
-# 保存数据（同步，用于退出）
+# 保存数据（同步）
 # ------------------------
 def save_data_sync(symbol):
     if not data_buffers[symbol]:
@@ -43,12 +43,11 @@ def save_data_sync(symbol):
     data_buffers[symbol].clear()
 
 # ------------------------
-# 主监听器：订阅 index/mark、orderbook、funding rate
+# 主监听器：采集 index/mark、orderbook、funding rate（含 next_funding_time）
 # ------------------------
 async def kucoin_futures_listener():
     global stop_flag
 
-    # 1. 获取 token
     token_info = get_futures_ws_token()
     endpoint = token_info["instanceServers"][0]["endpoint"]
     token = token_info["token"]
@@ -58,45 +57,41 @@ async def kucoin_futures_listener():
     print("📡 Subscribing symbols:", symbols)
 
     async with websockets.connect(ws_url) as ws:
-        # 2. 订阅 index/mark 价格
+        # 订阅 index/mark
         symbols_str = ",".join(symbols)
-        index_topic = f"/contract/instrument:{symbols_str}"
         await ws.send(json.dumps({
             "id": "sub_index_mark",
             "type": "subscribe",
-            "topic": index_topic,
+            "topic": f"/contract/instrument:{symbols_str}",
             "privateChannel": False,
             "response": True
         }))
-        print("✅ Subscribed to index/mark prices")
 
-        # 3. 订阅 Level2 Depth5（买一卖一）
+        # 订阅 orderbook
         for sym in symbols:
-            ob_topic = f"/contractMarket/level2Depth5:{sym}"
             await ws.send(json.dumps({
                 "id": f"sub_ob_{sym}",
                 "type": "subscribe",
-                "topic": ob_topic,
+                "topic": f"/contractMarket/level2Depth5:{sym}",
                 "privateChannel": False,
                 "response": True
             }))
-        print("✅ Subscribed to orderbook (top 5)")
 
-        # 4. 订阅 funding rate（资金费率）
+        # 订阅 funding rate（包含 next_funding_time）
         for sym in symbols:
-            funding_topic = f"/contractMarket/fundingRate:{sym}"
             await ws.send(json.dumps({
                 "id": f"sub_funding_{sym}",
                 "type": "subscribe",
-                "topic": funding_topic,
+                "topic": f"/contractMarket/fundingRate:{sym}",
                 "privateChannel": False,
                 "response": True
             }))
-        print("✅ Subscribed to funding rate")
+
+        print("✅ Subscribed to: index/mark, orderbook, funding rate")
 
         last_ping = asyncio.get_event_loop().time()
         while not stop_flag:
-            # 发送 ping 心跳（KuCoin Futures 要求 30 秒内）
+            # 心跳
             now_time = asyncio.get_event_loop().time()
             if now_time - last_ping >= 25:
                 await ws.send(json.dumps({"id": "ping", "type": "ping"}))
@@ -106,53 +101,61 @@ async def kucoin_futures_listener():
                 raw = await asyncio.wait_for(ws.recv(), timeout=10.0)
                 msg = json.loads(raw)
 
-                # 忽略 pong
                 if msg.get("type") == "pong":
                     continue
 
-                # 处理 index/mark 数据
+                topic = msg.get("topic", "")
+                if ":" not in topic:
+                    continue
+                symbol = topic.split(":")[1]
+                if symbol not in symbols:
+                    continue
+
+                data = msg.get("data", {})
+
+                # 1. Index / Mark Price
                 if msg.get("subject") == "mark.index.price":
-                    data = msg.get("data", {})
-                    topic = msg.get("topic", "")
-                    symbol = topic.split(":")[1]
-                    if symbol in symbols:
-                        data_buffers[symbol].append({
-                            "timestamp": data.get("timestamp"),
-                            "index_price": data.get("indexPrice"),
-                            "mark_price": data.get("markPrice"),
-                            "type": "index_mark"
-                        })
+                    data_buffers[symbol].append({
+                        "timestamp": data.get("timestamp"),  # 毫秒时间戳
+                        "index_price": float(data.get("indexPrice")) if data.get("indexPrice") is not None else None,
+                        "mark_price": float(data.get("markPrice")) if data.get("markPrice") is not None else None,
+                        "type": "index_mark"
+                    })
 
-                # 处理订单簿数据
+                # 2. Orderbook (Top Bid/Ask)
                 elif msg.get("subject") == "level2":
-                    data = msg.get("data", {})
-                    topic = msg.get("topic", "")
-                    symbol = topic.split(":")[1]
-                    if symbol in symbols:
-                        bids = data.get("bids", [])
-                        asks = data.get("asks", [])
-                        if bids and asks:
-                            best_bid = float(bids[0][0])
-                            best_ask = float(asks[0][0])
-                            data_buffers[symbol].append({
-                                "timestamp": data.get("timestamp"),
-                                "best_bid": best_bid,
-                                "best_ask": best_ask,
-                                "type": "orderbook"
-                            })
-
-                # 处理资金费率数据（新增）
-                elif msg.get("subject") == "funding.rate":
-                    data = msg.get("data", {})
-                    topic = msg.get("topic", "")
-                    symbol = topic.split(":")[1]
-                    if symbol in symbols:
+                    bids = data.get("bids", [])
+                    asks = data.get("asks", [])
+                    if bids and asks:
                         data_buffers[symbol].append({
-                            "timestamp": data.get("timestamp"),
-                            "funding_rate": data.get("fundingRate"),
-                            "next_funding_time": data.get("nextFundingTime"),
-                            "type": "funding_rate"
+                            "timestamp": data.get("timestamp"),  # 毫秒时间戳
+                            "best_bid": float(bids[0][0]),
+                            "best_ask": float(asks[0][0]),
+                            "type": "orderbook"
                         })
+
+                # 3. Funding Rate + Next Funding Time ✅（重点）
+                elif msg.get("subject") == "funding.rate":
+                    funding_rate = data.get("fundingRate")
+                    next_funding_time = data.get("nextFundingTime")
+
+                    # 转为数值类型（KuCoin 返回字符串）
+                    try:
+                        funding_rate = float(funding_rate) if funding_rate is not None else None
+                    except (ValueError, TypeError):
+                        funding_rate = None
+
+                    try:
+                        next_funding_time = int(next_funding_time) if next_funding_time is not None else None
+                    except (ValueError, TypeError):
+                        next_funding_time = None
+
+                    data_buffers[symbol].append({
+                        "timestamp": data.get("timestamp"),  # 当前推送时间
+                        "funding_rate": funding_rate,
+                        "next_funding_time": next_funding_time,  # ✅ 明确包含
+                        "type": "funding_rate"
+                    })
 
             except asyncio.TimeoutError:
                 continue
@@ -161,16 +164,16 @@ async def kucoin_futures_listener():
                 break
 
 # ------------------------
-# 定时保存任务
+# 定时保存（每10分钟）
 # ------------------------
 async def periodic_saver():
     while not stop_flag:
-        await asyncio.sleep(600)  # 10 minutes
+        await asyncio.sleep(600)
         for sym in symbols:
             save_data_sync(sym)
 
 # ------------------------
-# 信号处理器（优雅退出）
+# 优雅退出
 # ------------------------
 def signal_handler(sig, frame):
     global stop_flag
@@ -187,10 +190,10 @@ async def main():
     global stop_flag
     stop_flag = False
 
-    print("🚀 KuCoin Futures Real-Time Collector Started")
+    print("🚀 KuCoin Futures Data Collector (with Funding Rate + Next Funding Time)")
     print("📊 Symbols:", symbols)
     print("📁 Save dir:", save_dir)
-    print("✅ Collecting: index_price, mark_price, orderbook, funding_rate")
+    print("✅ Collecting: index_price, mark_price, orderbook, funding_rate, next_funding_time")
     print("🛑 Press Ctrl+C to stop safely\n")
 
     tasks = [
