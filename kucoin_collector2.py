@@ -26,7 +26,7 @@ symbols = [s + "M" for s in spot_symbols]
 # 例如：PNUTUSDTM 可能不存在，可临时移除
 # symbols = [s for s in symbols if s not in ["PNUTUSDTM", "CHESSUSDTM", ...]]
 
-save_dir = "kucoin_futures_data_2"
+save_dir = "kucoin_futures_data_3"
 os.makedirs(save_dir, exist_ok=True)
 data_buffers = defaultdict(list)
 stop_flag = False
