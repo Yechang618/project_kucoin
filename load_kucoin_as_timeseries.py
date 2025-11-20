@@ -14,7 +14,38 @@ CSV_DIR = "kucoin_csv"  # CSV 文件所在目录
 #     "LINKUSDTM", "XLMUSDTM", "BCHUSDTM", "HBARUSDTM", "ZECUSDTM",
 #     "AAVEUSDTM", "ENAUSDTM", "NEARUSDTM", "ONDOUSDTM"
 # ]  # ← 你关心的 symbol 列表
-SYMBOLS = ["SOLUSDTM"]
+SYMBOLS = [
+    "AAVEUSDTM",
+    "ADAUSDTM",
+    "AVAXUSDTM",
+    "BCHUSDTM",
+    "BNBUSDTM",
+    "COMPUSDTM",
+    "DOGEUSDTM",
+    "DOTUSDTM",
+    "ENAUSDTM",
+    "ETCUSDTM",
+    "ETHUSDTM",
+    "FETUSDTM",
+    "FORMUSDTM",
+    "HBARUSDTM",
+    "HFTUSDTM",
+    "LINKUSDTM",
+    "LTCUSDTM",
+    "NEARUSDTM",
+    "ONDOUSDTM",
+    "PNUTUSDTM",
+    "SOLUSDTM",
+    "THEUSDTM",
+    "TONUSDTM",
+    "TRXUSDTM",
+    "UNIUSDTM",
+    "XBTUSDTM",
+    "XLMUSDTM",
+    "XRPUSDTM",
+    "ZECUSDTM"
+]
+SYMBOLS = [SYMBOLS[0]]
 # ------------------------
 # 主函数
 # ------------------------
@@ -93,6 +124,6 @@ if __name__ == "__main__":
     print(df.columns[:10])  # 显示前10列
     
     # 保存为单个 CSV（可选）
-    output_file = "kucoin_combined_timeseries.csv"
+    output_file = f"kucoin_combined_timeseries_{SYMBOLS[0]}.csv"
     df.to_csv(output_file)
     print(f"\n💾 Saved combined time series to: {output_file}")

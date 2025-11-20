@@ -7,7 +7,7 @@ from pathlib import Path
 # ------------------------
 # 配置
 # ------------------------
-INPUT_DIR = "kucoin_data"      # 输入 JSON 文件夹
+INPUT_DIR = "kucoin_data_2"      # 输入 JSON 文件夹
 OUTPUT_DIR = "kucoin_csv"      # 输出 CSV 文件夹
 
 # 创建输出目录
