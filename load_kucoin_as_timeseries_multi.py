@@ -5,8 +5,10 @@ from pathlib import Path
 # ------------------------
 # 配置
 # ------------------------
-CSV_DIR = "kucoin_csv"      # 输入 CSV 目录
-OUTPUT_DIR = "kucoin_series"  # 输出目录（每个 symbol 一个 CSV）
+# version = '_3'
+version = ''
+CSV_DIR = f"kucoin_csv{version}"      # 输入 JSON 文件夹
+OUTPUT_DIR = f"kucoin_csv{version}"      # 输出 CSV 文件夹
 
 # 创建输出目录
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -16,7 +18,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # ------------------------
 def process_symbol(symbol, csv_dir="kucoin_csv", output_dir="kucoin_series"):
     """
-    加载单个 symbol 的 CSV，重采样到 1 秒，并保存到 output_dir。
+    加载单个 symbol 的 CSV, 重采样到 1 秒，并保存到 output_dir。
     """
     file_path = Path(csv_dir) / f"{symbol}.csv"
     if not file_path.exists():
@@ -49,7 +51,7 @@ def process_symbol(symbol, csv_dir="kucoin_csv", output_dir="kucoin_series"):
         df_1s = df.resample('1s').mean()
 
         # 保存到 output_dir
-        output_path = Path(output_dir) / f"{symbol}_1s.csv"
+        output_path = Path(output_dir) / f"{symbol}_1s{version}.csv"
         df_1s.to_csv(output_path)
         print(f"✅ Saved {len(df_1s)} rows for {symbol} to {output_path}")
         return True
@@ -61,7 +63,7 @@ def process_symbol(symbol, csv_dir="kucoin_csv", output_dir="kucoin_series"):
 # ------------------------
 # 自动获取所有可用 symbols
 # ------------------------
-def get_available_symbols(csv_dir="kucoin_csv"):
+def get_available_symbols(csv_dir="kucoin_csv_3"):
     """从 kucoin_csv 目录自动提取所有 symbol 名称"""
     symbols = []
     for file in Path(csv_dir).glob("*.csv"):

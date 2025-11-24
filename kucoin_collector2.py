@@ -91,14 +91,23 @@ async def kucoin_futures_listener():
         # 🔸 订阅 orderbook 和 funding rate（逐个订阅，更稳定）
         # ================================
         for sym in symbols:
-            # Orderbook
+            # Orderbook spot
             await ws.send(json.dumps({
                 "id": f"sub_ob_{sym}",
                 "type": "subscribe",
-                "topic": f"/contractMarket/level2Depth5:{sym}",
+                # "topic": f"/contractMarket/level2Depth5:{sym}",
+                "topic": f"/market/ticker:{sym}",
                 "privateChannel": False,
                 "response": True
             }))
+            # Orderbook contractMarket
+            await ws.send(json.dumps({
+                "id": f"sub_ob_{sym}",
+                "type": "subscribe",
+                "topic": f"/contractMarket/ticker:{sym}",
+                "privateChannel": False,
+                "response": True
+            }))            
             # Funding rate
             await ws.send(json.dumps({
                 "id": f"sub_funding_{sym}",
@@ -143,16 +152,37 @@ async def kucoin_futures_listener():
                     })
 
                 # 2. Orderbook
-                elif msg.get("subject") == "level2":
-                    bids = data.get("bids", [])
-                    asks = data.get("asks", [])
+                # elif msg.get("subject") == "level2":
+                #     bids = data.get("bids", [])
+                #     asks = data.get("asks", [])
+                #     if bids and asks:
+                #         data_buffers[symbol].append({
+                #             "timestamp": data.get("timestamp"),
+                #             "best_bid": float(bids[0][0]),
+                #             "best_ask": float(asks[0][0]),
+                #             "type": "orderbook"
+                #         })
+                # 4. Ticks
+                elif msg.get("subject") == "ticker":
+                    bids = data.get("bestBidPrice", [])
+                    asks = data.get("bestAskPrice", [])
                     if bids and asks:
                         data_buffers[symbol].append({
-                            "timestamp": data.get("timestamp"),
-                            "best_bid": float(bids[0][0]),
-                            "best_ask": float(asks[0][0]),
-                            "type": "orderbook"
+                            "timestamp": data.get("Time"),
+                            "best_bid": float(bids),
+                            "best_ask": float(asks),
+                            "type": "message"
                         })
+                elif msg.get("subject") == "trade.ticker":
+                    bids = data.get("bestBidPrice", [])
+                    asks = data.get("bestAskPrice", [])
+                    if bids and asks:
+                        data_buffers[symbol].append({
+                            "timestamp": data.get("Time"),
+                            "best_bid": float(bids),
+                            "best_ask": float(asks),
+                            "type": "message"
+                        })                        
 
                 # 3. Funding Rate
                 elif msg.get("subject") == "funding.rate":
