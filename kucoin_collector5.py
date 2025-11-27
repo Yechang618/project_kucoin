@@ -9,15 +9,20 @@ import websockets
 from collections import defaultdict
 
 # ------------------------
-# 配置
+# 配置（修正现货 symbol 格式）
 # ------------------------
-spot_symbols = [
-    "AGTUSDT", "DASHUSDT", "XMRUSDT", "BNBUSDT", "WCTUSDT","INJUSDT", 
+# 原始符号列表（无连字符）
+original_symbols = [
+    "AGTUSDT", "DASHUSDT", "XMRUSDT", "BNBUSDT", "WCTUSDT", "INJUSDT", 
     "KAITOUSDT", "HAEDALUSDT", "XPLUSDT", "DOTUSDT", "ONDOUSDT",
-    "ZECUSDT", "SUIUSDT", "GIGGLEUSDT", "XBTUSDT", "SOLUSDT", "PNUTUSDT","ADAUSDT", "LINKUSDT"
+    "ZECUSDT", "SUIUSDT", "GIGGLEUSDT"
 ]
 
-futures_symbols = [s + "M" for s in spot_symbols]
+# 转换为 KuCoin Spot 格式: "XBT-USDT"
+spot_symbols = [s[:-4] + "-USDT" for s in original_symbols if s.endswith("USDT")]
+
+# 期货符号保持 KuCoin Futures 格式: "XBTUSDTM"
+futures_symbols = [s + "M" for s in original_symbols]
 
 save_dir = "kucoin_data_combined_2"
 os.makedirs(save_dir, exist_ok=True)
@@ -25,19 +30,42 @@ data_buffers = defaultdict(list)
 stop_flag = False
 
 # ------------------------
-# 获取 Token（关键：移除 URL 末尾空格！）
+# 获取 Token（移除 URL 末尾空格）
 # ------------------------
 def get_futures_token():
-    url = "https://api-futures.kucoin.com/api/v1/bullet-public"  # ✅ 无空格
+    url = "https://api-futures.kucoin.com/api/v1/bullet-public"  # 无空格
     resp = requests.post(url, timeout=10)
     resp.raise_for_status()
     return resp.json()["data"]
 
 def get_spot_token():
-    url = "https://api.kucoin.com/api/v1/bullet-public"  # ✅ 无空格
+    url = "https://api.kucoin.com/api/v1/bullet-public"  # 无空格
     resp = requests.post(url, timeout=10)
     resp.raise_for_status()
     return resp.json()["data"]
+
+# ------------------------
+# 验证现货交易对是否存在
+# ------------------------
+def validate_spot_symbols(symbols):
+    """验证现货交易对是否在 KuCoin 上存在"""
+    try:
+        resp = requests.get("https://api.kucoin.com/api/v1/symbols", timeout=10)
+        if resp.status_code == 200:
+            all_symbols = {item["symbol"] for item in resp.json()["data"]}
+            valid = []
+            invalid = []
+            for s in symbols:
+                if s in all_symbols:
+                    valid.append(s)
+                else:
+                    invalid.append(s)
+            if invalid:
+                print(f"⚠️  Skipping invalid spot symbols: {invalid}")
+            return valid
+    except Exception as e:
+        print(f"❌ Failed to validate spot symbols: {e}. Proceeding with all symbols.")
+    return symbols
 
 # ------------------------
 # 保存数据
@@ -152,8 +180,7 @@ async def futures_listener_with_reconnect():
                     except asyncio.TimeoutError:
                         continue
 
-        except (websockets.exceptions.ConnectionClosed, websockets.exceptions.InvalidStatusCode,
-                requests.RequestException, OSError) as e:
+        except (websockets.exceptions.ConnectionClosed, requests.RequestException, OSError) as e:
             if stop_flag:
                 break
             print(f"⚠️ [Futures] Connection lost: {e}. Reconnecting in {reconnect_delay}s...")
@@ -161,16 +188,22 @@ async def futures_listener_with_reconnect():
             reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
 
 # ------------------------
-# Spot 监听器（修复数据结构）
+# Spot 监听器（关键修复）
 # ------------------------
 async def spot_listener_with_reconnect():
     global stop_flag
+    # 验证现货交易对
+    valid_symbols = validate_spot_symbols(spot_symbols)
+    if not valid_symbols:
+        print("❌ No valid spot symbols found. Spot listener disabled.")
+        return
+
     reconnect_delay = 1
     max_reconnect_delay = 60
 
     while not stop_flag:
         try:
-            token_info = get_spot_token()  # ✅ 现在能正确获取 token
+            token_info = get_spot_token()
             endpoint = token_info["instanceServers"][0]["endpoint"]
             token = token_info["token"]
             ws_url = f"{endpoint}?token={token}"
@@ -178,15 +211,15 @@ async def spot_listener_with_reconnect():
             async with websockets.connect(ws_url) as ws:
                 print("🔗 [Spot] Connected to KuCoin WebSocket")
 
-                for sym in spot_symbols:
+                for sym in valid_symbols:
                     await ws.send(json.dumps({
                         "id": f"spot_ticker_{sym}",
                         "type": "subscribe",
-                        "topic": f"/market/ticker:{sym}",
+                        "topic": f"/market/ticker:{sym}",  # KuCoin Spot 使用带连字符的 symbol
                         "privateChannel": False
                     }))
 
-                print(f"✅ [Spot] Subscribed to {len(spot_symbols)} symbols")
+                print(f"✅ [Spot] Subscribed to {len(valid_symbols)} symbols: {valid_symbols}")
                 reconnect_delay = 1
 
                 last_ping = asyncio.get_event_loop().time()
@@ -204,25 +237,24 @@ async def spot_listener_with_reconnect():
                         topic = msg.get("topic", "")
                         if ":" not in topic:
                             continue
-                        symbol = topic.split(":")[1]
-                        if symbol not in spot_symbols:
+                        symbol = topic.split(":")[1]  # 格式: "XBT-USDT"
+                        if symbol not in valid_symbols:
                             continue
 
                         data = msg.get("data", {})
-                        # ✅ 修复：Spot ticker 数据在 data 根层级
+                        # KuCoin Spot ticker 数据结构
                         data_buffers[symbol].append({
-                            "timestamp": data.get("time"),  # 使用 time 字段
+                            "timestamp": data.get("time"),        # 时间戳字段
                             "best_bid": float(data["bestBid"]) if data.get("bestBid") else None,
                             "best_ask": float(data["bestAsk"]) if data.get("bestAsk") else None,
-                            "last_price": float(data["price"]) if data.get("price") else None,
+                            "last_price": float(data["price"]) if data.get("price") else None,  # 最新价格
                             "type": "spot_ticker"
                         })
 
                     except asyncio.TimeoutError:
                         continue
 
-        except (websockets.exceptions.ConnectionClosed, websockets.exceptions.InvalidStatusCode,
-                requests.RequestException, OSError) as e:
+        except (websockets.exceptions.ConnectionClosed, requests.RequestException, OSError) as e:
             if stop_flag:
                 break
             print(f"⚠️ [Spot] Connection lost: {e}. Reconnecting in {reconnect_delay}s...")
@@ -255,14 +287,15 @@ def signal_handler(sig, frame):
 # 主函数
 # ------------------------
 async def main():
-    global stop_flag  # 修复拼写错误 stop_build → stop_flag
+    global stop_flag
     stop_flag = False
 
-    print("🚀 KuCoin Combined Data Collector (with Auto-Reconnect)")
-    print(f"📊 Spot symbols: {len(spot_symbols)}")
-    print(f"📊 Futures symbols: {len(futures_symbols)}")
+    print("🚀 KuCoin Combined Data Collector (Spot + Futures)")
+    print(f"📊 Raw symbols: {original_symbols}")
+    print(f"📊 Spot symbols: {spot_symbols} (KuCoin format)")
+    print(f"📊 Futures symbols: {futures_symbols}")
     print("📁 Save dir:", save_dir)
-    print("🔄 Auto-reconnect enabled (exponential backoff)")
+    print("🔄 Auto-reconnect enabled")
     print("🛑 Press Ctrl+C to stop safely\n")
 
     tasks = [
