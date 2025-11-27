@@ -7,11 +7,12 @@ from pathlib import Path
 # ------------------------
 # 配置
 # ------------------------
-version = '_3'
-# version = ''
-INPUT_DIR = f"kucoin_data{version}"      # 输入 JSON 文件夹
-INPUT_DIR = f"kucoin_futures_data{version}"      # 输入 JSON 文件夹
-OUTPUT_DIR = f"kucoin_futures_csv{version}"      # 输出 CSV 文件夹
+# version = '_3'
+version = ''
+INPUT_DIR = f"kucoin_data_combined{version}"      # 输入 JSON 文件夹
+# INPUT_DIR = f"kucoin_data{version}"      # 输入 JSON 文件夹
+# INPUT_DIR = f"kucoin_futures_data{version}"      # 输入 JSON 文件夹
+OUTPUT_DIR = f"kucoin_combined_csv{version}"      # 输出 CSV 文件夹
 
 # 创建输出目录
 os.makedirs(OUTPUT_DIR, exist_ok=True)

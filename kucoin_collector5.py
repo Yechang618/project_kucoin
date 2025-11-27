@@ -12,17 +12,11 @@ from collections import defaultdict
 # 配置
 # ------------------------
 spot_symbols = [
-    "XBTUSDT", "SOLUSDT", "PNUTUSDT", "XRPUSDT", "FETUSDT", "UNIUSDT",
-    "COMPUSDT", "THEUSDT", "AVAXUSDT", "LTCUSDT", "ETCUSDT", "FORMUSDT",
-    "TONUSDT", "HFTUSDT", "DOTUSDT", "CHESSUSDT", "ETHUSDT", "BNBUSDT",
-    "TRXUSDT", "DOGEUSDT", "ADAUSDT", "LINKUSDT", "XLMUSDT", "BCHUSDT",
-    "HBARUSDT", "ZECUSDT", "AAVEUSDT", "ENAUSDT", "NEARUSDT", "ONDOUSDT"
+    "AGTUSDT", "DASHUSDT", "XMRUSDT", "BNBUSDT", "WCTUSDT","INJUSDT", 
+    "KAITOUSDT", "HAEDALUSDT", "XPLUSDT", "DOTUSDT", "ONDOUSDT",
+    "ZECUSDT", "SUIUSDT", "GIGGLEUSDT", "XBTUSDT", "SOLUSDT", "PNUTUSDT","ADAUSDT", "LINKUSDT"
 ]
-# spot_symbols = [
-#     "AGTUSDT", "DASHUSDT", "XMRUSDT", "BNBUSDT", "WCTUSDT","INJUSDT", 
-#     "KAITOUSDT", "HAEDALUSDT", "XPLUSDT", "DOTUSDT", "ONDOUSDT",
-#     "ZECUSDT", "SUIUSDT", "GIGGLEUSDT", 
-# ]
+
 futures_symbols = [s + "M" for s in spot_symbols]
 
 save_dir = "kucoin_data_combined_2"
@@ -31,16 +25,16 @@ data_buffers = defaultdict(list)
 stop_flag = False
 
 # ------------------------
-# 获取 Token（修复 URL 末尾空格）
+# 获取 Token（关键：移除 URL 末尾空格！）
 # ------------------------
 def get_futures_token():
-    url = "https://api-futures.kucoin.com/api/v1/bullet-public"  # 移除末尾空格
+    url = "https://api-futures.kucoin.com/api/v1/bullet-public"  # ✅ 无空格
     resp = requests.post(url, timeout=10)
     resp.raise_for_status()
     return resp.json()["data"]
 
 def get_spot_token():
-    url = "https://api.kucoin.com/api/v1/bullet-public"  # 移除末尾空格
+    url = "https://api.kucoin.com/api/v1/bullet-public"  # ✅ 无空格
     resp = requests.post(url, timeout=10)
     resp.raise_for_status()
     return resp.json()["data"]
@@ -62,12 +56,12 @@ def save_data_sync(symbol):
     data_buffers[symbol].clear()
 
 # ------------------------
-# 带重连的 Futures 监听器
+# Futures 监听器（保持不变）
 # ------------------------
 async def futures_listener_with_reconnect():
     global stop_flag
-    reconnect_delay = 1  # 初始重连延迟（秒）
-    max_reconnect_delay = 60  # 最大重连延迟
+    reconnect_delay = 1
+    max_reconnect_delay = 60
 
     while not stop_flag:
         try:
@@ -79,7 +73,6 @@ async def futures_listener_with_reconnect():
             async with websockets.connect(ws_url) as ws:
                 print("🔗 [Futures] Connected to KuCoin WebSocket")
                 
-                # 订阅数据
                 batch_size = 50
                 for i in range(0, len(futures_symbols), batch_size):
                     batch = futures_symbols[i:i+batch_size]
@@ -106,11 +99,10 @@ async def futures_listener_with_reconnect():
                     }))
 
                 print(f"✅ [Futures] Subscribed to {len(futures_symbols)} symbols")
-                reconnect_delay = 1  # 重置重连延迟
+                reconnect_delay = 1
 
                 last_ping = asyncio.get_event_loop().time()
                 while not stop_flag:
-                    # 心跳
                     now = asyncio.get_event_loop().time()
                     if now - last_ping >= 25:
                         await ws.send(json.dumps({"id": "ping", "type": "ping"}))
@@ -166,10 +158,10 @@ async def futures_listener_with_reconnect():
                 break
             print(f"⚠️ [Futures] Connection lost: {e}. Reconnecting in {reconnect_delay}s...")
             await asyncio.sleep(reconnect_delay)
-            reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)  # 指数退避
+            reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
 
 # ------------------------
-# 带重连的 Spot 监听器
+# Spot 监听器（修复数据结构）
 # ------------------------
 async def spot_listener_with_reconnect():
     global stop_flag
@@ -178,7 +170,7 @@ async def spot_listener_with_reconnect():
 
     while not stop_flag:
         try:
-            token_info = get_spot_token()
+            token_info = get_spot_token()  # ✅ 现在能正确获取 token
             endpoint = token_info["instanceServers"][0]["endpoint"]
             token = token_info["token"]
             ws_url = f"{endpoint}?token={token}"
@@ -217,12 +209,12 @@ async def spot_listener_with_reconnect():
                             continue
 
                         data = msg.get("data", {})
-                        ticker = data.get("ticker", {})
+                        # ✅ 修复：Spot ticker 数据在 data 根层级
                         data_buffers[symbol].append({
-                            "timestamp": int(data.get("ts", 0)) if data.get("ts") else None,
-                            "best_bid": float(ticker["bestBid"]) if ticker.get("bestBid") else None,
-                            "best_ask": float(ticker["bestAsk"]) if ticker.get("bestAsk") else None,
-                            "last_price": float(ticker["last"]) if ticker.get("last") else None,
+                            "timestamp": data.get("time"),  # 使用 time 字段
+                            "best_bid": float(data["bestBid"]) if data.get("bestBid") else None,
+                            "best_ask": float(data["bestAsk"]) if data.get("bestAsk") else None,
+                            "last_price": float(data["price"]) if data.get("price") else None,
                             "type": "spot_ticker"
                         })
 
@@ -263,7 +255,7 @@ def signal_handler(sig, frame):
 # 主函数
 # ------------------------
 async def main():
-    global stop_build
+    global stop_flag  # 修复拼写错误 stop_build → stop_flag
     stop_flag = False
 
     print("🚀 KuCoin Combined Data Collector (with Auto-Reconnect)")
