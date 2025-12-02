@@ -7,8 +7,8 @@ from pathlib import Path
 # ------------------------
 # version = '_3'
 version = ''
-CSV_DIR = f"kucoin_csv{version}"      # 输入 JSON 文件夹
-OUTPUT_DIR = f"kucoin_csv{version}"      # 输出 CSV 文件夹
+CSV_DIR = f"kucoin_csv{version}"      # 输入 CSV 文件夹
+OUTPUT_DIR = f"kucoin_series{version}"      # 输出 CSV 文件夹
 
 # 创建输出目录
 os.makedirs(OUTPUT_DIR, exist_ok=True)

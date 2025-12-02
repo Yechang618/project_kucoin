@@ -37,6 +37,9 @@ def process_symbol(symbol, csv_dir="kucoin_csv", output_dir="kucoin_series"):
             return False
 
         # 2. 转换时间（毫秒 -> datetime）
+        # if "'" in df['timestamp'].astype(str).iloc[0]:
+        #     print(f"ℹ️  Cleaning quotes in 'timestamp' for {symbol}.csv.")
+        #     df['timestamp'] = df['timestamp'].astype(str).str.replace("'", "").astype(np.int64)
         df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
         
         # 3. 转换数据类型
