@@ -7,7 +7,7 @@ from pathlib import Path
 # ------------------------
 # 配置
 # ------------------------
-version = '_3'
+version = '_4'
 INPUT_DIR = f"kucoin_data/kucoin_data_combined{version}"
 OUTPUT_DIR = f"kucoin_csv/kucoin_combined_csv{version}"
 os.makedirs(OUTPUT_DIR, exist_ok=True)

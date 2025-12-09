@@ -2,11 +2,12 @@ import pandas as pd
 from pathlib import Path
 
 # 配置
-symbol = "SOL"
+symbols = ["SOL", "BNB", "ZEC", "KAITO", "DOT"]
+symbol = symbols[4]
 quote = "USDT"
 pair = f"{symbol}{quote}"
-processed_dir = Path("datasets/processed")
-output_dir = Path("datasets/kronos")
+processed_dir, output_dir = Path("datasets/training"), Path("datasets/kronos")
+# processed_dir, output_dir = Path("datasets/testing"), Path("datasets/kronos_test")
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # 收集所有 processed 文件
@@ -60,7 +61,10 @@ df_kronos = df_kronos.dropna(how="all")
 
 # 保存为 Kronos 格式
 output_file = output_dir / f"{pair}_kronos.csv.gz"
+if "timestamp" in df_kronos.columns:
+    df_kronos = df_kronos.rename(columns={"timestamp": "timestamps"})
+print(df_kronos.info())
 print(f"Saving Kronos dataset: {output_file}")
-df_kronos.to_csv(output_file, compression="gzip", date_format="%Y-%m-%d %H:%M:%S")
-
+# df_kronos.to_csv(output_file, compression="gzip", date_format="%Y-%m-%d %H:%M:%S")
+df_kronos.to_csv(output_file,  date_format="%Y-%m-%d %H:%M:%S")
 print("✅ Done.")

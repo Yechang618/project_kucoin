@@ -24,7 +24,9 @@ spot_symbols = [s[:-4] + "-USDT" for s in original_symbols if s.endswith("USDT")
 # 期货符号保持 KuCoin Futures 格式: "XBTUSDTM"
 futures_symbols = [s + "M" for s in original_symbols]
 
-save_dir = "kucoin_data_combined_2"
+# save_dir = "kucoin_data_combined_2"
+version = '_4'
+save_dir = f"kucoin_data/kucoin_data_combined{version}"
 os.makedirs(save_dir, exist_ok=True)
 data_buffers = defaultdict(list)
 stop_flag = False
