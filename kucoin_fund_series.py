@@ -296,6 +296,35 @@ async def futures_listener_with_reconnect():
     reconnect_delay = 1
     max_reconnect_delay = 60
 
+    # 合理时间戳范围（毫秒）：2020-01-01 到 2030-12-31
+    MIN_TS = 1577836800000
+    MAX_TS = 1924992000000
+
+    def normalize_timestamp(ts_val, is_ticker_ts=False):
+        """
+        Normalize timestamp to milliseconds.
+        - For ticker.ts: often in nanoseconds
+        - For others: usually in milliseconds
+        """
+        if ts_val is None:
+            return None
+        try:
+            ts = int(ts_val)
+        except (ValueError, TypeError):
+            return None
+
+        # Heuristic: detect unit by magnitude
+        if ts > 10**16:          # Nanoseconds (e.g., 1765135262823000000)
+            ts //= 1_000_000     # → milliseconds
+        elif ts > 10**13:        # Microseconds (e.g., 1765135262823000)
+            ts //= 1_000         # → milliseconds
+        # else: assume already milliseconds
+
+        # Validate range
+        if MIN_TS <= ts <= MAX_TS:
+            return ts
+        return None
+
     while not stop_flag:
         try:
             token_info = get_futures_token()
@@ -353,35 +382,48 @@ async def futures_listener_with_reconnect():
 
                         data = msg.get("data", {})
                         record = {"symbol": symbol}
+
                         if msg.get("subject") == "mark.index.price":
-                            record.update({
-                                "timestamp": data.get("timestamp"),
-                                "index_price": float(data["indexPrice"]) if data.get("indexPrice") else None,
-                                "mark_price": float(data["markPrice"]) if data.get("markPrice") else None,
-                                "type": "futures_index_mark"
-                            })
+                            # timestamp is in milliseconds
+                            ts = normalize_timestamp(data.get("timestamp"))
+                            if ts is not None:
+                                record.update({
+                                    "timestamp": ts,
+                                    "index_price": float(data["indexPrice"]) if data.get("indexPrice") else None,
+                                    "mark_price": float(data["markPrice"]) if data.get("markPrice") else None,
+                                    "type": "futures_index_mark"
+                                })
+                                data_buffers[symbol].append(record)
+
                         elif msg.get("subject") == "ticker":
-                            record.update({
-                                "timestamp": data.get("ts"),
-                                "best_bid": float(data["bestBidPrice"]) if data.get("bestBidPrice") else None,
-                                "best_ask": float(data["bestAskPrice"]) if data.get("bestAskPrice") else None,
-                                "last_price": float(data["lastPrice"]) if data.get("lastPrice") else None,
-                                "type": "futures_ticker"
-                            })
+                            # ts is often in NANOSECONDS!
+                            ts = normalize_timestamp(data.get("ts"), is_ticker_ts=True)
+                            if ts is not None:
+                                record.update({
+                                    "timestamp": ts,
+                                    "best_bid": float(data["bestBidPrice"]) if data.get("bestBidPrice") else None,
+                                    "best_ask": float(data["bestAskPrice"]) if data.get("bestAskPrice") else None,
+                                    "last_price": float(data["lastPrice"]) if data.get("lastPrice") else None,
+                                    "type": "futures_ticker"
+                                })
+                                data_buffers[symbol].append(record)
+
                         elif msg.get("subject") == "funding.rate":
-                            try:
-                                funding_rate = float(data["fundingRate"]) if data.get("fundingRate") else None
-                                next_funding = int(data["nextFundingTime"]) if data.get("nextFundingTime") else None
-                            except (ValueError, TypeError):
-                                funding_rate = next_funding = None
-                            record.update({
-                                "timestamp": data.get("timestamp"),
-                                "funding_rate": funding_rate,
-                                "next_funding_time": next_funding,
-                                "type": "futures_funding"
-                            })
-                        if record.get("timestamp") is not None:
-                            data_buffers[symbol].append(record)
+                            # timestamp is in milliseconds
+                            ts = normalize_timestamp(data.get("timestamp"))
+                            if ts is not None:
+                                try:
+                                    funding_rate = float(data["fundingRate"]) if data.get("fundingRate") not in (None, "") else None
+                                    next_funding = int(data["nextFundingTime"]) if data.get("nextFundingTime") not in (None, "") else None
+                                except (ValueError, TypeError):
+                                    funding_rate = next_funding = None
+                                record.update({
+                                    "timestamp": ts,
+                                    "funding_rate": funding_rate,
+                                    "next_funding_time": next_funding,
+                                    "type": "futures_funding"
+                                })
+                                data_buffers[symbol].append(record)
 
                     except asyncio.TimeoutError:
                         continue
