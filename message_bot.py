@@ -32,7 +32,7 @@ url_private = "https://open.feishu.cn/open-apis/bot/v2/hook/4519b97c-d166-430f-8
 
 # 例子：
 my_url = url_private
-my_bot = Bot(my_url )
+my_bot = Bot(my_url)
 a = 12345
 my_msg = f"Hello, test{a}"
 my_bot.text(my_msg)
