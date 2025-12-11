@@ -9,6 +9,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 import numpy as np
 
+import message_bot as mb
 # ==================== 配置 ====================
 DATA_DIR = "./kucoin_data/raw_data"
 OUTPUT_DIR = "./kucoin_data/regression_results"
@@ -111,6 +112,8 @@ def main():
 
                 swap_bid = rec.get("swap_bid_avg")
                 swap_ask = rec.get("swap_ask_avg")
+                spot_bid = rec.get("spot_bid_avg")
+                spot_ask = rec.get("spot_ask_avg")                
                 index_price = rec.get("index_price_avg")
                 funding_rate = rec.get("funding_rate")
 
@@ -124,7 +127,7 @@ def main():
                         continue
                     funding_estimate = mid_swap / index - 1.0
                     t = get_t_minutes(dt, interval_start)
-                    symbol_raw[symbol].append((t, funding_estimate, float(funding_rate), ts))
+                    symbol_raw[symbol].append((t, funding_estimate, float(funding_rate), ts, spot_bid, spot_ask, index_price))
                 except (ValueError, TypeError, ZeroDivisionError):
                     continue
         except Exception as e:
@@ -132,6 +135,7 @@ def main():
 
     # Process each symbol
     results = []
+    b0s = []
     for symbol, data in symbol_raw.items():
         if len(data) < 2:
             continue
@@ -142,6 +146,9 @@ def main():
         fe_vals = [d[1] for d in data]
         fr_vals = [d[2] for d in data]
         ts_vals = [d[3] for d in data]
+        spot_bids = [d[4] for d in data]
+        spot_asks = [d[5] for d in data]    
+        index_prices = [d[6] for d in data]
 
         # Compute recursive average: avg_fe[t] = mean(funding_estimate from first to current)
         avg_fe = []
@@ -171,7 +178,13 @@ def main():
         b = float(model.coef_[0])
         a = float(model.intercept_)
         last_ts = int(max(ts_vals))
-
+        b0 = index_prices[-1] - (spot_bids[-1] + spot_asks[-1]) / 2.0 - a/b*index_prices[-1] if b != 0 else 0.0
+        b0s.append({
+            "symbol": symbol,
+            "b0": b0,
+            "r2_score": r2,
+            "last_timestamp": last_ts
+        })
         results.append({
             "symbol": symbol,
             "b": b,
@@ -188,6 +201,14 @@ def main():
 
     print(f"✅ Saved {len(results)} regression results to {output_path}")
     print("🎉 Done.")
+
+    url = "https://open.feishu.cn/open-apis/bot/v2/hook/c5634e62-18fa-45e7-9af3-a2dfea7be4eb"
+    # url = "https://open.feishu.cn/open-apis/bot/v2/hook/4519b97c-d166-430f-87bc-13a6b8d35dac"
+    my_url = url
+    my_bot = mb.Bot(my_url)
+    # a = 123456
+    # my_msg = f"Hello, test{a}"
+    my_bot.text(str(b0s))
 
 if __name__ == "__main__":
     main()
