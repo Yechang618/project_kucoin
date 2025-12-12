@@ -210,8 +210,8 @@ def main():
     msg = ''
     msg_report = ''
     for res in results:
-        msg += f"Symbol: {res['symbol']}, b0: {res['b0']:.3f}, b: {res['b']:.3f}, a: {res['a']:.3f}, R²: {res['r2_score']:.2f}\n"
-        msg_report += f"Symbol: {res['symbol']}, b0: {res['b0']:.3f},  R²: {res['r2_score']:.2f}\n"
+        msg += f"Symbol: {res['symbol']}, b0: {res['b0']:.6f}, b: {res['b']:.6f}, a: {res['a']:.6f}, R²: {res['r2_score']:.2f}\n"
+        msg_report += f"Symbol: {res['symbol']}, b0: {res['b0']:.6f},  R²: {res['r2_score']:.2f}\n"
     my_bot.text(msg)
     # report_bot.text(msg_report)
 if __name__ == "__main__":
