@@ -187,6 +187,7 @@ def main():
         })
         results.append({
             "symbol": symbol,
+            "b0": b0,
             "b": b,
             "a": a,
             "r2_score": r2,
@@ -202,17 +203,16 @@ def main():
     print(f"✅ Saved {len(results)} regression results to {output_path}")
     print("🎉 Done.")
 
-    # url = "https://open.feishu.cn/open-apis/bot/v2/hook/c5634e62-18fa-45e7-9af3-a2dfea7be4eb"
-    url = "https://open.feishu.cn/open-apis/bot/v2/hook/4519b97c-d166-430f-87bc-13a6b8d35dac" # my own one
-    my_url = url
+    url_report = "https://open.feishu.cn/open-apis/bot/v2/hook/c5634e62-18fa-45e7-9af3-a2dfea7be4eb"
+    my_url = "https://open.feishu.cn/open-apis/bot/v2/hook/4519b97c-d166-430f-87bc-13a6b8d35dac" # my own one
     my_bot = mb.Bot(my_url)
-    # a = 123456
-    # my_msg = f"Hello, test{a}"
+    report_bot = mb.Bot(url_report) 
     msg = ''
+    msg_report = ''
     for res in results:
-        msg += f"Symbol: {res['symbol']}, b: {res['b']:.3f}, a: {res['a']:.3f}, R²: {res['r2_score']:.2f}\n"
-
+        msg += f"Symbol: {res['symbol']}, b0: {res['b0']:.3f}, b: {res['b']:.3f}, a: {res['a']:.3f}, R²: {res['r2_score']:.2f}\n"
+        msg_report += f"Symbol: {res['symbol']}, b0: {res['b0']:.3f},  R²: {res['r2_score']:.2f}\n"
     my_bot.text(msg)
-
+    # report_bot.text(msg_report)
 if __name__ == "__main__":
     main()
