@@ -8,6 +8,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 import numpy as np
+import sys
 
 import message_bot as mb
 # ==================== 配置 ====================
@@ -75,7 +76,7 @@ def file_window_overlaps_interval(filename, target_interval, target_date):
     return False
 
 # ==================== 主逻辑 ====================
-def main():
+def main(mode=None):
     interval_id, date_str, interval_start = get_current_interval_info()
     interval_names = ["00:01-08:00", "08:01-16:00", "16:01-24:00"]
     print(f"🕒 Current UTC time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
@@ -213,6 +214,16 @@ def main():
         msg += f"Symbol: {res['symbol']}, b0: {res['b0']:.6f}, b: {res['b']:.6f}, a: {res['a']:.6f}, R²: {res['r2_score']:.2f}\n"
         msg_report += f"Symbol: {res['symbol']}, b0: {res['b0']:.6f},  R²: {res['r2_score']:.2f}\n"
     my_bot.text(msg)
+    if mode == None:
+        print("Message to report bot:")
+        report_bot.text(msg)
+    
     # report_bot.text(msg_report)
 if __name__ == "__main__":
-    main()
+    # main()
+    if len(sys.argv) > 1:
+        # The first argument (sys.argv[0]) should be 'test' or empty
+        variable_from_command_line = sys.argv[1]
+        main(mode = variable_from_command_line)
+    else:
+        main()   
