@@ -209,8 +209,16 @@ def main(mode=None):
         else:
             b0 = 0.0
 
+        b0_theoretical = (index_prices[-1] - (spot_bids[-1] + spot_asks[-1]) / 2.0) - 1e-4 * index_prices[-1]
+        if r2 >= 0.6:
+            b0_estimate = b0_theoretical*(1-r2) + b0*r2
+        else:
+            b0_estimate = b0_theoretical
+
         results.append({
             "symbol": symbol,
+            "b0_estimate": b0_estimate,
+            "b0_theoretical": b0_theoretical,
             "b0": b0,
             "b": b,
             "a": a,
@@ -236,11 +244,13 @@ def main(mode=None):
     my_url = "https://open.feishu.cn/open-apis/bot/v2/hook/4519b97c-d166-430f-87bc-13a6b8d35dac"
     my_bot = mb.Bot(my_url)
     report_bot = mb.Bot(url_report)
+    msg_detail = ''
     msg = ''
     for res in results:
-        msg += f"Symbol: {res['symbol']}, b0: {res['b0']:.6f}, b: {res['b']:.6f}, a: {res['a']:.6f}, R²: {res['r2_score']:.2f}\n"
-    my_bot.text(msg)
-    if mode != '-test':  # 根据你的原始逻辑，非 -all 模式才发报告
+        msg += f"Symbol: {res['symbol']}, b0_estimate: {res['b0_estimate']:.6f}\n"
+        msg_detail += f"Symbol: {res['symbol']}, b0_estimate: {res['b0_estimate']:.6f}, b0_theoretical: {res['b0_theoretical']:.6f}, b0: {res['b0']:.6f}, b: {res['b']:.6f}, a: {res['a']:.6f}, R²: {res['r2_score']:.2f}\n"
+    my_bot.text(msg_detail)
+    if mode != '-test':  # 非 -test 模式才发报告
         report_bot.text(msg)
 
 

@@ -3,10 +3,11 @@ from pathlib import Path
 
 # 配置
 symbols = ["SOL", "BNB", "ZEC", "KAITO", "DOT", "ETH", "BTC", "LTC", "XRP", "ADA", "DOGE", "AVAX", "ETC", "TAO"]
-symbol = symbols[3]
+symbol = symbols[13]
 quote = "USDT"
 pair = f"{symbol}{quote}"
-processed_dir, output_dir = Path("datasets/task3/training"), Path("datasets/kronos_task3_train")
+processed_dir, output_dir = Path("datasets/task3/all"), Path("datasets/kronos_task3_all")
+# processed_dir, output_dir = Path("datasets/task3/training"), Path("datasets/kronos_task3_train")
 # processed_dir, output_dir = Path("datasets/task3/testing"), Path("datasets/kronos_task3_test")
 output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -21,7 +22,7 @@ print(f"Found {len(files)} processed file(s).")
 all_dfs = []
 for f in sorted(files):
     print(f"Loading {f.name}...")
-    df = pd.read_csv(f, parse_dates=["timestamp"], index_col="timestamp")
+    df = pd.read_csv(f, parse_dates=["timestamps"], index_col="timestamps")
     all_dfs.append(df)
 
 df_all = pd.concat(all_dfs, axis=0).sort_index()
@@ -45,11 +46,11 @@ df_kronos["amount"] = df_all["Amount"]
 
 # 可选：移除全 NaN 行（如 funding_rate 初始缺失）
 df_kronos = df_kronos.dropna(how="all")
-df_kronos.index.names = ["timestamps"]
+# df_kronos.index.names = ["timestamps"]
 # 保存为 Kronos 格式
 output_file = output_dir / f"{pair}_task3.csv"
-if "timestamp" in df_kronos.columns:
-    df_kronos = df_kronos.rename(columns={"timestamp": "timestamps"})
+# if "timestamp" in df_kronos.columns:
+#     df_kronos = df_kronos.rename(columns={"timestamp": "timestamps"})
 print(df_kronos.info())
 print(f"Saving Kronos dataset: {output_file}")
 # df_kronos.to_csv(output_file, compression="gzip", date_format="%Y-%m-%d %H:%M:%S")

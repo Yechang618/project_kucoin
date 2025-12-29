@@ -14,7 +14,7 @@ processed_dir.mkdir(parents=True, exist_ok=True)
 
 symbols = ["SOL", "BNB", "ZEC", "KAITO", "DOT", "ETH", "BTC", "LTC", "XRP", "ADA", "DOGE", "AVAX", "ETC", "TAO"]
 # symbol = "SOL"
-symbol = symbols[4]
+symbol = symbols[13]
 quote = "USDT"
 pair = f"{symbol}{quote}"
 
