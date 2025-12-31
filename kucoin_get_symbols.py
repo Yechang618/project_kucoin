@@ -131,11 +131,11 @@ def update_symbols_public(symbolPath: str, avoid_list: Optional[List[str]] = Non
             symbols[base_asset] = {
                 "spot": spot_symbol,
                 "future": future_symbol,
-                "feeCategory": spot_data.get('feeCurrency', 'USDT'),
+                "feeCategory": spot_data.get('feeCurrency', 'NAN'),
                 "isMarginEnabled": spot_data.get('isMarginEnabled', False),
                 "mul": mul,
-                "spTakerFee": Decimal('0.001'),    # 默认现货手续费
-                "fuTakerFee": Decimal('0.0005'),   # 默认合约手续费
+                "spTakerFee": spot_data.get('spTakerFee', 'NAN'),    # 默认现货手续费
+                "fuTakerFee": spot_data.get('fuTakerFee', 'NAN'),   # 默认合约手续费
                 "multiplier": multiplier,
                 "lotSize": lot_result,
                 "minSize": min_result,

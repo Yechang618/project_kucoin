@@ -11,7 +11,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone, timedelta
 
 # ==================== 配置 ====================
-SYMBOL_FILE = 'symbol_1.json'
+SYMBOL_FILE = 'symbol_2.json'
 DATA_DIR = "./kucoin_data/raw_data"
 os.makedirs(DATA_DIR, exist_ok=True)
 

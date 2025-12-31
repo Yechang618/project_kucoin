@@ -3,16 +3,24 @@ import sys
 import json
 import glob
 import re
+import time
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
+from redis import Redis
+import yaml
+from util import DecimalEncoder
 
 import message_bot as mb
+
 # ==================== 配置 ====================
 DATA_DIR = "./kucoin_data/raw_data"
 OUTPUT_DIR = "./kucoin_data/regression_results"
+config_path = "./config/config.yaml"
+with open(config_path, 'r', encoding='utf-8') as f:
+    config = yaml.safe_load(f)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Settlement intervals: (start_hour, start_minute, end_hour, end_minute)
@@ -22,6 +30,8 @@ SETTLEMENT_INTERVALS = [
     (16, 1, 24, 0)  # Interval 2: 16:01 – 24:00
 ]
 
+# ... (你的所有函数定义保持不变: get_current_interval_info, time_in_interval, etc.) ...
+# 为节省篇幅，此处省略，但你的完整脚本中请保留它们
 def get_current_interval_info():
     now = datetime.now(timezone.utc)
     if now.hour == 0 and now.minute == 0:
@@ -205,8 +215,16 @@ def main(mode=None):
         else:
             b0 = 0.0
 
+        b0_theoretical = (index_prices[-1] - (spot_bids[-1] + spot_asks[-1]) / 2.0) - 1e-4 * index_prices[-1]
+        if r2 >= 0.6:
+            b0_estimate = b0_theoretical*(1-r2) + b0*r2
+        else:
+            b0_estimate = b0_theoretical
+
         results.append({
             "symbol": symbol,
+            "b0_estimate": b0_estimate,
+            "b0_theoretical": b0_theoretical,
             "b0": b0,
             "b": b,
             "a": a,
@@ -232,18 +250,40 @@ def main(mode=None):
     my_url = "https://open.feishu.cn/open-apis/bot/v2/hook/4519b97c-d166-430f-87bc-13a6b8d35dac"
     my_bot = mb.Bot(my_url)
     report_bot = mb.Bot(url_report)
+    msg_detail = ''
     msg = ''
+    dic = {}
     for res in results:
-        msg += f"Symbol: {res['symbol']}, b0: {res['b0']:.6f}, b: {res['b']:.6f}, a: {res['a']:.6f}, R²: {res['r2_score']:.2f}\n"
-    my_bot.text(msg)
-    if mode == '-all':  # 只有 -all 模式才发 report bot
+        dic[res['symbol']] = res['b0_estimate']
+        msg += f"Symbol: {res['symbol']}, b0_estimate: {res['b0_estimate']:.6f}\n"
+        msg_detail += f"Symbol: {res['symbol']}, b0_estimate: {res['b0_estimate']:.6f}, b0_theoretical: {res['b0_theoretical']:.6f}, b0: {res['b0']:.6f}, b: {res['b']:.6f}, a: {res['a']:.6f}, R²: {res['r2_score']:.2f}\n"
+    my_bot.text(msg_detail)
+    if mode != '-test':  # 非 -test 模式才发报告
         report_bot.text(msg)
-        
+    r = Redis(host=config['redisUrl'], db=1, password=config['redisPass'])
+    signals_str = json.dumps(dic, cls=DecimalEncoder)        
+    r.publish(f'kucoin_zero_fundingrate', signals_str)
+
+
+
+# ==================== 主循环 ====================
 if __name__ == "__main__":
-    # main()
-    if len(sys.argv) > 1:
-        # The first argument (sys.argv[0]) should be 'test' or empty
-        variable_from_command_line = sys.argv[1]
-        main(mode = variable_from_command_line)
-    else:
-        main()   
+    # 获取命令行参数（如果有）
+    mode = sys.argv[1] if len(sys.argv) > 1 else None
+
+    print("🔄 Regression analysis script started. Press Ctrl+C to stop.")
+    try:
+        while True:
+            # 计算并打印下一次运行时间
+            next_run = datetime.now() + timedelta(minutes=30)
+            print(f"\n🕒 Next run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+
+            # 执行主逻辑
+            main(mode=mode)
+
+            # 休眠30分钟 (1800秒)
+            time.sleep(1800)
+
+    except KeyboardInterrupt:
+        print("\n🛑 Script stopped by user.")
+        sys.exit(0)
