@@ -210,12 +210,13 @@ def main(mode=None):
         last_ts = int(max(ts_vals))
 
         # Calculate b0 (as defined in your formula)
-        if b != 0:
-            b0 = (index_prices[-1] - (spot_bids[-1] + spot_asks[-1]) / 2.0) - (a / b) * index_prices[-1]
+        spot_price = (spot_bids[-1] + spot_asks[-1]) / 2.0
+        if abs(b) > 1e-8:
+            b0 = ((index_prices[-1] - spot_price) - (a / b) * index_prices[-1])/spot_price
         else:
             b0 = 0.0
 
-        b0_theoretical = (index_prices[-1] - (spot_bids[-1] + spot_asks[-1]) / 2.0) - 1e-4 * index_prices[-1]
+        b0_theoretical = ((index_prices[-1] - spot_price) - 1e-4 * index_prices[-1]) / spot_price
         if r2 >= 0.6:
             b0_estimate = b0_theoretical*(1-r2) + b0*r2
         else:
@@ -225,6 +226,7 @@ def main(mode=None):
             "symbol": symbol,
             "b0_estimate": b0_estimate,
             "b0_theoretical": b0_theoretical,
+            "spot_price": spot_price,
             "b0": b0,
             "b": b,
             "a": a,
@@ -256,7 +258,10 @@ def main(mode=None):
     for res in results:
         dic[res['symbol']] = res['b0_estimate']
         msg += f"Symbol: {res['symbol']}, b0_estimate: {res['b0_estimate']:.6f}\n"
-        msg_detail += f"Symbol: {res['symbol']}, b0_estimate: {res['b0_estimate']:.6f}, b0_theoretical: {res['b0_theoretical']:.6f}, b0: {res['b0']:.6f}, b: {res['b']:.6f}, a: {res['a']:.6f}, R²: {res['r2_score']:.2f}\n"
+        msg_detail += f"Symbol: {res['symbol']}, \
+                        b0_estimate: {res['b0_estimate']:.6f}, b0_theoretical: {res['b0_theoretical']:.6f}, \
+                        b0: {res['b0']:.6f}, spot_price: {res['spot_price']:.6f}, b: {res['b']:.6f}, \
+                        a: {res['a']:.6f}, R²: {res['r2_score']:.2f}\n"
     my_bot.text(msg_detail)
     if mode != '-test':  # 非 -test 模式才发报告
         report_bot.text(msg)
