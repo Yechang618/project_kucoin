@@ -144,6 +144,13 @@ def main(mode=None):
                 if None in (swap_bid, swap_ask, index_price, funding_rate):
                     continue
 
+                if symbol.startswith("10000"):
+                    spot_bid = spot_bid*1e4
+                    spot_ask = spot_ask*1e4
+                elif symbol.startswith("1000"):
+                    spot_bid = spot_bid*1e3
+                    spot_ask = spot_ask*1e3
+                    
                 try:
                     mid_swap = (float(swap_bid) + float(swap_ask)) / 2.0
                     index = float(index_price)
