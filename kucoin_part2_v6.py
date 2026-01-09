@@ -198,9 +198,9 @@ def main(mode=None):
     my_bot.text(msg_detail)
     if mode != '-test':  # 非 -test 模式才发报告
         report_bot.text(msg)
-    r = Redis(host=config['redisUrl'], db=1, password=config['redisPass'])
-    signals_str = json.dumps(dic, cls=DecimalEncoder)        
-    r.publish(f'kucoin_zero_fundingrate', signals_str)
+        # r = Redis(host=config['redisUrl'], db=1, password=config['redisPass'])
+        # signals_str = json.dumps(dic, cls=DecimalEncoder)        
+        # r.publish(f'kucoin_zero_fundingrate', signals_str)
 
 # ==================== 主循环 ====================
 if __name__ == "__main__":
