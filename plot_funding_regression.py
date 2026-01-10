@@ -11,6 +11,8 @@ from sklearn.metrics import r2_score
 
 # ==================== 配置 ====================
 DATA_DIR = "./kucoin_data/raw_data"
+FIGURE_DIR = "./figure"
+os.makedirs(FIGURE_DIR, exist_ok=True)
 
 def load_symbol_data(symbol, hours=8):
     """
@@ -71,13 +73,14 @@ def load_symbol_data(symbol, hours=8):
                         if index == 0:
                             continue
                         funding_estimate = mid_swap / index - 1.0
+                        spot_price = (float(spot_bid) + float(spot_ask)) / 2.0
                         
                         records.append({
+                            'datetime': dt,
                             'timestamp': ts,
                             'funding_estimate': funding_estimate,
                             'funding_rate': float(funding_rate),
-                            'spot_bid': float(spot_bid),
-                            'spot_ask': float(spot_ask),
+                            'spot_price': spot_price,
                             'index_price': float(index_price)
                         })
                     except (ValueError, TypeError, ZeroDivisionError):
@@ -103,10 +106,9 @@ def compute_recursive_average(values):
     return avg_values
 
 def main():
-    parser = argparse.ArgumentParser(description='Plot funding rate regression for a symbol')
+    parser = argparse.ArgumentParser(description='Plot funding rate regression and price comparison')
     parser.add_argument('symbol', type=str, help='Symbol name (e.g., BTC)')
     parser.add_argument('--hours', type=int, default=8, help='Hours of historical data to load (default: 8)')
-    parser.add_argument('--output', type=str, help='Output image file path (optional)')
     args = parser.parse_args()
     
     try:
@@ -115,14 +117,12 @@ def main():
         print(f"📊 Loaded {len(records)} records for {args.symbol}")
         
         if len(records) < 2:
-            print("❌ Not enough data points (< 2) for regression")
+            print("❌ Not enough data points (< 2) for analysis")
             return
         
         # 2. 准备回归数据
         fe_vals = [r['funding_estimate'] for r in records]
         fr_vals = [r['funding_rate'] for r in records]
-        
-        # 计算递归平均 funding_estimate
         avg_fe = compute_recursive_average(fe_vals)
         
         # 3. 线性回归
@@ -141,28 +141,56 @@ def main():
         print(f"   Intercept (a): {intercept:.6f}")
         print(f"   R²: {r2:.4f}")
         
-        # 4. 绘制图表
+        # 4. 创建 figure 目录中的文件名
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_filename = f"{args.symbol}_{timestamp_str}"
+        regression_plot_path = os.path.join(FIGURE_DIR, f"{base_filename}_regression.png")
+        price_plot_path = os.path.join(FIGURE_DIR, f"{base_filename}_prices.png")
+        
+        # 5. 绘制回归图
         plt.figure(figsize=(12, 8))
         plt.scatter(avg_fe, fr_vals, alpha=0.6, s=20, label='Data points')
         plt.plot(avg_fe, y_pred, color='red', linewidth=2, label=f'Regression line (R²={r2:.4f})')
         
-        # 标题和标签
-        title = f'{args.symbol} Funding Rate Regression\nSlope: {slope:.6f}, Intercept: {intercept:.6f}, R²: {r2:.4f}'
-        plt.title(title, fontsize=14, pad=20)
+        title1 = f'{args.symbol} Funding Rate Regression\nSlope: {slope:.6f}, Intercept: {intercept:.6f}, R²: {r2:.4f}'
+        plt.title(title1, fontsize=14, pad=20)
         plt.xlabel('Recursive Average of Funding Estimate (avg_fe)', fontsize=12)
         plt.ylabel('Actual Funding Rate', fontsize=12)
         plt.legend()
         plt.grid(True, alpha=0.3)
-        
-        # 调整布局
         plt.tight_layout()
+        plt.savefig(regression_plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"💾 Saved regression plot to: {regression_plot_path}")
         
-        # 5. 保存或显示
-        if args.output:
-            plt.savefig(args.output, dpi=300, bbox_inches='tight')
-            print(f"💾 Saved plot to: {args.output}")
-        else:
-            plt.show()
+        # 6. 绘制价格对比图
+        datetimes = [r['datetime'] for r in records]
+        index_prices = [r['index_price'] for r in records]
+        spot_prices = [r['spot_price'] for r in records]
+        
+        plt.figure(figsize=(14, 8))
+        plt.plot(datetimes, index_prices, label='Index Price', linewidth=2, alpha=0.8)
+        plt.plot(datetimes, spot_prices, label='Spot Price', linewidth=2, alpha=0.8)
+        plt.fill_between(datetimes, index_prices, spot_prices, alpha=0.2, color='gray')
+        
+        # 计算价差统计
+        price_diffs = np.array(index_prices) - np.array(spot_prices)
+        mean_diff = np.mean(price_diffs)
+        max_diff = np.max(np.abs(price_diffs))
+        
+        title2 = f'{args.symbol} Price Comparison (Last {args.hours} Hours)\nMean Diff: {mean_diff:.4f}, Max |Diff|: {max_diff:.4f}'
+        plt.title(title2, fontsize=14, pad=20)
+        plt.xlabel('Time (UTC)', fontsize=12)
+        plt.ylabel('Price (USDT)', fontsize=12)
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.savefig(price_plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"💾 Saved price plot to: {price_plot_path}")
+        
+        print(f"✅ Both plots saved to: {FIGURE_DIR}/")
             
     except FileNotFoundError as e:
         print(f"❌ Error: {e}")
