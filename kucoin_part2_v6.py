@@ -25,7 +25,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # 移除 SETTLEMENT_INTERVALS（不再需要）
 
-def main(mode=None):
+def main(b0_estimates, b0_max = 4, mode=None):
     use_all_data = (mode == '-all')
 
     if use_all_data:
@@ -154,9 +154,14 @@ def main(mode=None):
         else:
             b0_estimate = b0_theoretical
 
+        b0_estimates[symbol].append(b0_estimate)
+        if len(b0_estimates[symbol]) > b0_max:
+            b0_estimates[symbol].pop(0)
+        b0_estimate_ema = sum(b0_estimates[symbol]) / len(b0_estimates[symbol])
         results.append({
             "symbol": symbol,
             "b0_estimate": b0_estimate,
+            "b0_estimate_ema": b0_estimate_ema,
             "b0_theoretical": b0_theoretical,
             "spot_price": spot_price,
             "b0": b0,
@@ -189,9 +194,9 @@ def main(mode=None):
     msg = ''
     dic = {}
     for res in results:
-        dic[res['symbol']] = res['b0_estimate']
-        msg += f"Symbol: {res['symbol']}, b0_estimate: {res['b0_estimate']:.6f}\n"
-        msg_detail += f"Symbol: {res['symbol']}, \
+        dic[res['symbol']] = res['b0_estimate_ema']
+        msg += f"Symbol: {res['symbol']}, b0_estimate: {res['b0_estimate_ema']:.6f}\n"
+        msg_detail += f"Symbol: {res['symbol']}, b0_estimate_ema: {res['b0_estimate_ema']:.6f}, N_b0: {len(b0_estimates[res['symbol']])},\
                         b0_estimate: {res['b0_estimate']:.6f}, b0_theoretical: {res['b0_theoretical']:.6f}, \
                         b0: {res['b0']:.6f}, spot_price: {res['spot_price']:.6f}, b: {res['b']:.6f}, \
                         a: {res['a']:.6f}, R²: {res['r2_score']:.2f}\n"
@@ -201,18 +206,20 @@ def main(mode=None):
         # r = Redis(host=config['redisUrl'], db=1, password=config['redisPass'])
         # signals_str = json.dumps(dic, cls=DecimalEncoder)        
         # r.publish(f'kucoin_zero_fundingrate', signals_str)
+    return b0_estimates
 
 # ==================== 主循环 ====================
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else None
 
     print("🔄 Regression analysis script started. Press Ctrl+C to stop.")
+    b0_estimates = defaultdict(list)
     try:
         while True:
             next_run = datetime.now() + timedelta(minutes=30)
             print(f"\n🕒 Next run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
-            main(mode=mode)
+            b0_estimates = main(b0_estimates, mode=mode)
 
             time.sleep(1800)
 
