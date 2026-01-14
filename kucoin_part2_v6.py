@@ -219,7 +219,7 @@ if __name__ == "__main__":
             next_run = datetime.now() + timedelta(minutes=30)
             print(f"\n🕒 Next run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
-            b0_estimates = main(b0_estimates, mode=mode)
+            b0_estimates = main(b0_estimates, b0_max = 8, mode=mode)
 
             time.sleep(1800)
 
